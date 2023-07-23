@@ -19,6 +19,20 @@ import re
 import sqlfluff
 import sqlparse
 
+'''
+This script can be used to extract multiple JSON/SQL script(s) out of a mixed text.
+Especially for LLM result parsing, sometimes the results are malformed.
+
+
+Empowered by mature parsing technology, this script try to extract in following steps:
+
+1. loop through the text to find the start symbols e.g. SELECT, WITH, ...
+2. use an existing parser (json parser or sqlfluff parser) to parse the remaining text
+3. determine the exact script by parsing the error message
+4. until the end of the text
+'''
+
+
 @staticmethod
 def extract_sql_command(
     text: str,
@@ -119,11 +133,10 @@ def extract_json_command(text: str, return_all: bool = False) -> str:
         # check the text character by character
         if text[extract_pos] in ['{', '[']:
             current_text = text[extract_pos:]
-            current_statement = text[extract_pos:]
              # try to use json.loads to check the syntax
             try:
                 candidate_json = ""
-                current_lines = current_statement.splitlines()
+                current_lines = current_text.splitlines()
                 json.loads(current_text)
             except json.decoder.JSONDecodeError as e:
                 # parse the error message
@@ -143,6 +156,7 @@ def extract_json_command(text: str, return_all: bool = False) -> str:
                             if len(candidate_json.strip()) == 0:
                                 pass
                             else:
+                                # double check using json.loads
                                 try:
                                     json.loads(candidate_json)
                                     extract_pos += len(candidate_json) - 1
