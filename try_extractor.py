@@ -21,14 +21,14 @@ import sqlparse
 import xml
 
 '''
-This script can be used to extract multiple JSON/SQL script(s) out of a mixed text.
+This script can be used to extract multiple JSON/SQL/XML script(s) out of a mixed text.
 Especially for LLM result parsing, sometimes the results are malformed.
 
 
 Empowered by mature parsing technology, this script try to extract in following steps:
 
 1. loop through the text to find the start symbols e.g. SELECT, WITH, ...
-2. use an existing parser (json parser or sqlfluff parser) to parse the remaining text
+2. use an existing parser (json parser, sqlfluff parser or xml dom parser) to parse the remaining text
 3. determine the exact script by parsing the error message
 4. until the end of the text
 '''
