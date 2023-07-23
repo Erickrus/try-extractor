@@ -18,6 +18,7 @@ import json
 import re
 import sqlfluff
 import sqlparse
+import xml
 
 '''
 This script can be used to extract multiple JSON/SQL script(s) out of a mixed text.
@@ -86,6 +87,8 @@ def extract_sql_command(
                 try:
                     sqlfluff.parse(current_statement, dialect=dialect)
                     candidate_sql = current_statement
+                    extract_pos += len(candidate_sql) - 1
+                    res.append(candidate_sql)
                 except sqlfluff.api.simple.APIParsingError as e:
                     # find out first violation's line and position
                     # parse the error message
@@ -138,6 +141,9 @@ def extract_json_command(text: str, return_all: bool = False) -> str:
                 candidate_json = ""
                 current_lines = current_text.splitlines()
                 json.loads(current_text)
+                candidate_json = current_text
+                extract_pos += len(candidate_json) - 1
+                res.append(candidate_json)
             except json.decoder.JSONDecodeError as e:
                 # parse the error message
                 msg_lines = str(e).split("\n")
@@ -161,6 +167,54 @@ def extract_json_command(text: str, return_all: bool = False) -> str:
                                     json.loads(candidate_json)
                                     extract_pos += len(candidate_json) - 1
                                     res.append(candidate_json)
+                                except Exception as e:
+                                    pass
+        extract_pos += 1
+    if return_all:
+        return res # return all valid
+    if len(res) == 0:
+        return ""
+    else:
+        return max(res, key=len) # return the longest
+
+@staticmethod
+def extract_xml_command(text: str, strict: bool = True, return_all: bool = False) -> str:
+    res = []
+    extract_pos = 0
+    error_line_pattern = r".*: line (\d+), column (\d+).*"
+
+    while extract_pos < len(text) - 2:
+        # check the text character by character
+        if text[extract_pos] in ['<']:
+            current_text = text[extract_pos:]
+             # try to use json.loads to check the syntax
+            try:
+                candidate_xml = ""
+                current_lines = current_text.splitlines()
+                xml.dom.minidom.parseString(current_text)
+                candidate_xml = current_text
+                extract_pos += len(candidate_xml) - 1
+                res.append(candidate_xml)
+            except xml.parsers.expat.ExpatError as e:
+                if 'junk after document element' in e.args[0]:
+                    msg_lines = str(e.args[0]).split("\n")
+                    for j in range(len(msg_lines)):
+                        if re.search(error_line_pattern, msg_lines[j]):
+                            line_and_column = str(msg_lines[j]).split(":")[1].split(' ')
+                            line_no, position = line_and_column[2], line_and_column[4]
+                            line_no, position = int(line_no.strip(',')), int(position.strip())
+                            for k in range(line_no-1):
+                                candidate_xml += current_lines[k] + "\n"
+                            candidate_xml += current_lines[line_no-1][:position]
+                            if len(candidate_xml.strip()) == 0:
+                                pass
+                            elif strict and not candidate_xml.lower().startswith("<?xml"):
+                                pass
+                            else:
+                                try:
+                                    xml.dom.minidom.parseString(candidate_xml)
+                                    extract_pos += len(candidate_xml) - 1
+                                    res.append(candidate_xml)
                                 except Exception as e:
                                     pass
         extract_pos += 1
